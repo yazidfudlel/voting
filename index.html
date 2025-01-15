@@ -129,7 +129,7 @@
         // Default admin credentials
         const ADMIN_USERNAME = 'admin';
         const ADMIN_PASSWORD = 'passadmin';
-        
+    
         // Default user credentials (15 users)
         const USERS = {
             'Dawam': '1dawam',
@@ -143,10 +143,10 @@
             'Kholid Abdullah': 'dull99',
             'Diak Kyu Matsusaka Putra': 'masdiak'
         };
-
+    
         let currentUser = null;
         let countdownInterval;
-
+    
         // Initialize localStorage if empty
         if (!localStorage.getItem('sessions')) {
             localStorage.setItem('sessions', JSON.stringify([]));
@@ -154,7 +154,7 @@
         if (!localStorage.getItem('votes')) {
             localStorage.setItem('votes', JSON.stringify({}));
         }
-
+    
         // Event listener for vote type selection
         document.getElementById('voteType').addEventListener('change', function() {
             document.getElementById('candidateList').classList.toggle('hidden', this.value === 'free');
@@ -164,7 +164,7 @@
             const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
             const loginError = document.getElementById('loginError');
-
+    
             if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
                 currentUser = 'admin';
                 showAdminPanel();
@@ -175,18 +175,36 @@
                 loginError.textContent = 'Username atau password salah!';
                 return;
             }
-
+    
             document.getElementById('loginSection').classList.add('hidden');
         }
 
         function showAdminPanel() {
             document.getElementById('adminPanel').classList.remove('hidden');
             updateSessionList();
+            // Add refresh button for admin panel
+            const refreshButton = document.createElement('button');
+            refreshButton.textContent = 'Refresh';
+            refreshButton.onclick = refreshSessionList;
+            document.getElementById('adminPanel').appendChild(refreshButton);
         }
-
+    
         function showVotingPanel() {
             document.getElementById('votingPanel').classList.remove('hidden');
             updateActiveSession();
+            // Add refresh button for voting panel
+            const refreshButton = document.createElement('button');
+            refreshButton.textContent = 'Refresh';
+            refreshButton.onclick = refreshSessionList;
+            document.getElementById('votingPanel').appendChild(refreshButton);
+        }
+    
+        function refreshSessionList() {
+            if (currentUser === 'admin') {
+                updateSessionList();
+            } else if (currentUser) {
+                updateActiveSession();
+            }
         }
 
         function createSession() {
@@ -198,17 +216,17 @@
             const candidates = voteType === 'predetermined' 
                 ? document.getElementById('candidates').value.split(',').map(c => c.trim())
                 : [];
-
+    
             if (!name || !startTime || !endTime || !maxVotes) {
                 alert('Semua field harus diisi!');
                 return;
             }
-
+    
             if (startTime >= endTime) {
                 alert('Waktu mulai harus lebih awal dari waktu selesai!');
                 return;
             }
-
+    
             const sessions = JSON.parse(localStorage.getItem('sessions'));
             sessions.push({
                 id: Date.now(),
@@ -219,7 +237,7 @@
                 voteType,
                 candidates
             });
-
+    
             localStorage.setItem('sessions', JSON.stringify(sessions));
             updateSessionList();
         }
@@ -244,12 +262,12 @@
             
             return `${days}h ${hours}j ${minutes}m ${seconds}d`;
         }
-
+    
         function updateSessionList() {
             const sessions = JSON.parse(localStorage.getItem('sessions'));
             const sessionList = document.getElementById('sessionList');
             sessionList.innerHTML = '';
-
+    
             sessions.sort((a, b) => b.startTime - a.startTime).forEach(session => {
                 const votes = JSON.parse(localStorage.getItem('votes'))[session.id] || {};
                 const status = getSessionStatus(session.startTime, session.endTime);
@@ -265,7 +283,7 @@
                 } else {
                     statusBadge = '<span class="status-badge status-ended">Selesai</span>';
                 }
-
+    
                 div.innerHTML = `
                     <h4>${session.name} ${statusBadge}</h4>
                     <p>Mulai: ${new Date(session.startTime).toLocaleString()}</p>
@@ -286,13 +304,13 @@
             const activeSession = sessions.find(s => now >= s.startTime && now <= s.endTime);
             const votingForm = document.getElementById('votingForm');
             const activeSessionDiv = document.getElementById('activeSession');
-
+    
             if (!activeSession) {
                 // Check for upcoming sessions
                 const upcomingSessions = sessions
                     .filter(s => now < s.startTime)
                     .sort((a, b) => a.startTime - b.startTime);
-
+    
                 if (upcomingSessions.length > 0) {
                     const nextSession = upcomingSessions[0];
                     activeSessionDiv.innerHTML = `
@@ -314,20 +332,20 @@
                 votingForm.innerHTML = '';
                 return;
             }
-
+    
             const votes = JSON.parse(localStorage.getItem('votes'));
             if (votes[activeSession.id] && votes[activeSession.id][currentUser]) {
                 activeSessionDiv.innerHTML = '<p>Anda sudah melakukan voting untuk sesi ini.</p>';
                 votingForm.innerHTML = '';
                 return;
             }
-
+    
             activeSessionDiv.innerHTML = `
                 <h3>${activeSession.name}</h3>
                 <p>Berakhir dalam: <span id="countdown"></span></p>
                 <p>Maksimal ${activeSession.maxVotes} pilihan</p>
-            `;
-
+                `;
+    
             // Setup countdown for end time
             if (countdownInterval) clearInterval(countdownInterval);
             countdownInterval = setInterval(() => {
@@ -336,7 +354,7 @@
                     countdown.textContent = formatCountdown(activeSession.endTime);
                 }
             }, 1000);
-
+    
             if (activeSession.voteType === 'predetermined') {
                 votingForm.innerHTML = `
                     <select multiple id="voteSelect" size="${Math.min(activeSession.candidates.length, 5)}">
@@ -364,17 +382,17 @@
             } else {
                 selectedVotes = document.getElementById('voteInput').value.split(',').map(v => v.trim());
             }
-
+    
             if (selectedVotes.length > session.maxVotes) {
                 document.getElementById('votingError').textContent = `Maksimal ${session.maxVotes} pilihan!`;
                 return;
             }
-
+    
             if (!votes[sessionId]) {
                 votes[sessionId] = {};
             }
             votes[sessionId][currentUser] = selectedVotes;
-
+    
             localStorage.setItem('votes', JSON.stringify(votes));
             document.getElementById('votingSuccess').textContent = 'Vote berhasil disimpan!';
             updateActiveSession();
@@ -387,7 +405,7 @@
                     results[vote] = (results[vote] || 0) + 1;
                 });
             });
-
+    
             const totalVotes = Object.values(votes).length;
             const sortedResults = Object.entries(results)
                 .sort((a, b) => b[1] - a[1])
@@ -396,37 +414,37 @@
                     return `${name}: ${count} suara (${percentage}%)`;
                 })
                 .join('\n');
-
+    
             return sortedResults || 'Belum ada suara';
         }
-
-        // Fungsi untuk auto-refresh setiap menit
-        function setupAutoRefresh() {
-            setInterval(() => {
-                if (currentUser === 'admin') {
-                    updateSessionList();
-                } else if (currentUser) {
-                    updateActiveSession();
-                }
-            }, 60000); // Refresh setiap 1 menit
-        }
-
+    
+        // Remove the auto-refresh setup function
+        // function setupAutoRefresh() {
+        //     setInterval(() => {
+        //         if (currentUser === 'admin') {
+        //             updateSessionList();
+        //         } else if (currentUser) {
+        //             updateActiveSession();
+        //         }
+        //     }, 60000); // Refresh setiap 1 menit
+        // }
+    
         // Fungsi untuk validasi input waktu
         function validateSessionTimes() {
             const startTime = new Date(document.getElementById('startTime').value).getTime();
             const endTime = new Date(document.getElementById('endTime').value).getTime();
             const now = Date.now();
-
+    
             if (startTime < now) {
                 alert('Waktu mulai tidak boleh lebih awal dari waktu sekarang!');
                 return false;
             }
-
+    
             if (endTime <= startTime) {
                 alert('Waktu selesai harus lebih dari waktu mulai!');
                 return false;
             }
-
+    
             return true;
         }
 
@@ -440,31 +458,31 @@
             const candidates = voteType === 'predetermined' 
                 ? document.getElementById('candidates').value.split(',').map(c => c.trim()).filter(c => c)
                 : [];
-
+    
             if (!name || !startTime || !endTime || !maxVotes) {
                 alert('Semua field harus diisi!');
                 return;
             }
-
+    
             if (!validateSessionTimes()) {
                 return;
             }
-
+    
             if (voteType === 'predetermined' && candidates.length === 0) {
                 alert('Harap masukkan daftar kandidat!');
                 return;
             }
-
+    
             if (maxVotes <= 0) {
                 alert('Jumlah maksimal pilihan harus lebih dari 0!');
                 return;
             }
-
+    
             if (voteType === 'predetermined' && maxVotes > candidates.length) {
                 alert('Jumlah maksimal pilihan tidak boleh lebih dari jumlah kandidat!');
                 return;
             }
-
+    
             const sessions = JSON.parse(localStorage.getItem('sessions'));
             const newSession = {
                 id: Date.now(),
@@ -476,7 +494,7 @@
                 candidates,
                 createdAt: Date.now()
             };
-
+    
             sessions.push(newSession);
             localStorage.setItem('sessions', JSON.stringify(sessions));
             
@@ -488,14 +506,15 @@
             document.getElementById('voteType').value = 'free';
             document.getElementById('candidates').value = '';
             document.getElementById('candidateList').classList.add('hidden');
-
+    
             updateSessionList();
             alert('Sesi voting berhasil dibuat!');
         }
 
         // Setup saat halaman dimuat
         window.onload = function() {
-            setupAutoRefresh();
+            // Removed setupAutoRefresh call
+            // setupAutoRefresh();
             
             // Set minimal datetime untuk input
             const now = new Date();
@@ -503,7 +522,7 @@
             document.getElementById('startTime').min = nowString;
             document.getElementById('endTime').min = nowString;
         };
-
+    
         // Cleanup saat halaman ditutup
         window.onbeforeunload = function() {
             if (countdownInterval) {
