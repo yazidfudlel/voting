@@ -1,1 +1,293 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Voting Kartatedja</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .hidden {
+            display: none;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+        input, select {
+            padding: 8px;
+            margin: 5px 0;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .error {
+            color: red;
+            margin: 10px 0;
+        }
+        .success {
+            color: green;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <!-- Login Section -->
+    <div id="loginSection" class="container">
+        <h2>Login</h2>
+        <input type="text" id="username" placeholder="Username">
+        <input type="password" id="password" placeholder="Password">
+        <button onclick="login()">Login</button>
+        <div id="loginError" class="error"></div>
+    </div>
 
+    <!-- Admin Panel -->
+    <div id="adminPanel" class="container hidden">
+        <h2>Admin Panel</h2>
+        <h3>Buat Sesi Baru</h3>
+        <input type="text" id="sessionName" placeholder="Nama Sesi">
+        <input type="datetime-local" id="deadline">
+        <input type="number" id="maxVotes" min="1" placeholder="Jumlah Maksimal Pilihan">
+        <select id="voteType">
+            <option value="free">Bebas</option>
+            <option value="predetermined">Ditentukan</option>
+        </select>
+        <div id="candidateList" class="hidden">
+            <h4>Daftar Kandidat</h4>
+            <input type="text" id="candidates" placeholder="Nama kandidat (pisahkan dengan koma)">
+        </div>
+        <button onclick="createSession()">Buat Sesi</button>
+        <hr>
+        <h3>Daftar Sesi</h3>
+        <div id="sessionList"></div>
+    </div>
+
+    <!-- Voting Panel -->
+    <div id="votingPanel" class="container hidden">
+        <h2>Panel Voting</h2>
+        <div id="activeSession"></div>
+        <div id="votingForm"></div>
+        <div id="votingError" class="error"></div>
+        <div id="votingSuccess" class="success"></div>
+    </div>
+
+    <script>
+        // Default admin credentials
+        const ADMIN_USERNAME = 'admin';
+        const ADMIN_PASSWORD = 'admin123';
+        
+        // Default user credentials (15 users)
+        const USERS = {
+            'user1': 'pass1',
+            'user2': 'pass2',
+            'user3': 'pass3',
+            'user4': 'pass4',
+            'user5': 'pass5',
+            'user6': 'pass6',
+            'user7': 'pass7',
+            'user8': 'pass8',
+            'user9': 'pass9',
+            'user10': 'pass10',
+            'user11': 'pass11',
+            'user12': 'pass12',
+            'user13': 'pass13',
+            'user14': 'pass14',
+            'user15': 'pass15'
+        };
+
+        let currentUser = null;
+
+        // Initialize localStorage if empty
+        if (!localStorage.getItem('sessions')) {
+            localStorage.setItem('sessions', JSON.stringify([]));
+        }
+        if (!localStorage.getItem('votes')) {
+            localStorage.setItem('votes', JSON.stringify({}));
+        }
+
+        // Event listener for vote type selection
+        document.getElementById('voteType').addEventListener('change', function() {
+            document.getElementById('candidateList').classList.toggle('hidden', this.value === 'free');
+        });
+
+        function login() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const loginError = document.getElementById('loginError');
+
+            if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
+                currentUser = 'admin';
+                showAdminPanel();
+            } else if (USERS[username] && USERS[username] === password) {
+                currentUser = username;
+                showVotingPanel();
+            } else {
+                loginError.textContent = 'Username atau password salah!';
+                return;
+            }
+
+            document.getElementById('loginSection').classList.add('hidden');
+        }
+
+        function showAdminPanel() {
+            document.getElementById('adminPanel').classList.remove('hidden');
+            updateSessionList();
+        }
+
+        function showVotingPanel() {
+            document.getElementById('votingPanel').classList.remove('hidden');
+            updateActiveSession();
+        }
+
+        function createSession() {
+            const name = document.getElementById('sessionName').value;
+            const deadline = new Date(document.getElementById('deadline').value).getTime();
+            const maxVotes = parseInt(document.getElementById('maxVotes').value);
+            const voteType = document.getElementById('voteType').value;
+            const candidates = voteType === 'predetermined' 
+                ? document.getElementById('candidates').value.split(',').map(c => c.trim())
+                : [];
+
+            if (!name || !deadline || !maxVotes) {
+                alert('Semua field harus diisi!');
+                return;
+            }
+
+            const sessions = JSON.parse(localStorage.getItem('sessions'));
+            sessions.push({
+                id: Date.now(),
+                name,
+                deadline,
+                maxVotes,
+                voteType,
+                candidates
+            });
+
+            localStorage.setItem('sessions', JSON.stringify(sessions));
+            updateSessionList();
+        }
+
+        function updateSessionList() {
+            const sessions = JSON.parse(localStorage.getItem('sessions'));
+            const sessionList = document.getElementById('sessionList');
+            sessionList.innerHTML = '';
+
+            sessions.forEach(session => {
+                const votes = JSON.parse(localStorage.getItem('votes'))[session.id] || {};
+                const div = document.createElement('div');
+                div.className = 'container';
+                div.innerHTML = `
+                    <h4>${session.name}</h4>
+                    <p>Deadline: ${new Date(session.deadline).toLocaleString()}</p>
+                    <p>Max Votes: ${session.maxVotes}</p>
+                    <p>Tipe: ${session.voteType === 'free' ? 'Bebas' : 'Ditentukan'}</p>
+                    ${session.candidates.length ? `<p>Kandidat: ${session.candidates.join(', ')}</p>` : ''}
+                    <h5>Hasil Voting:</h5>
+                    <pre>${formatVoteResults(votes)}</pre>
+                `;
+                sessionList.appendChild(div);
+            });
+        }
+
+        function updateActiveSession() {
+            const sessions = JSON.parse(localStorage.getItem('sessions'));
+            const activeSession = sessions.find(s => s.deadline > Date.now());
+            const votingForm = document.getElementById('votingForm');
+            const activeSessionDiv = document.getElementById('activeSession');
+
+            if (!activeSession) {
+                activeSessionDiv.innerHTML = '<p>Tidak ada sesi voting yang aktif.</p>';
+                votingForm.innerHTML = '';
+                return;
+            }
+
+            const votes = JSON.parse(localStorage.getItem('votes'));
+            if (votes[activeSession.id] && votes[activeSession.id][currentUser]) {
+                activeSessionDiv.innerHTML = '<p>Anda sudah melakukan voting untuk sesi ini.</p>';
+                votingForm.innerHTML = '';
+                return;
+            }
+
+            activeSessionDiv.innerHTML = `
+                <h3>${activeSession.name}</h3>
+                <p>Deadline: ${new Date(activeSession.deadline).toLocaleString()}</p>
+                <p>Maksimal ${activeSession.maxVotes} pilihan</p>
+            `;
+
+            if (activeSession.voteType === 'predetermined') {
+                votingForm.innerHTML = `
+                    <select multiple id="voteSelect" size="${Math.min(activeSession.candidates.length, 5)}">
+                        ${activeSession.candidates.map(c => `<option value="${c}">${c}</option>`).join('')}
+                    </select>
+                    <button onclick="submitVote(${activeSession.id})">Submit Vote</button>
+                `;
+            } else {
+                votingForm.innerHTML = `
+                    <input type="text" id="voteInput" placeholder="Masukkan nama (pisahkan dengan koma)">
+                    <button onclick="submitVote(${activeSession.id})">Submit Vote</button>
+                `;
+            }
+        }
+
+        function submitVote(sessionId) {
+            const sessions = JSON.parse(localStorage.getItem('sessions'));
+            const session = sessions.find(s => s.id === sessionId);
+            const votes = JSON.parse(localStorage.getItem('votes'));
+            
+            let selectedVotes;
+            if (session.voteType === 'predetermined') {
+                const select = document.getElementById('voteSelect');
+                selectedVotes = Array.from(select.selectedOptions).map(option => option.value);
+            } else {
+                selectedVotes = document.getElementById('voteInput').value.split(',').map(v => v.trim());
+            }
+
+            if (selectedVotes.length > session.maxVotes) {
+                document.getElementById('votingError').textContent = `Maksimal ${session.maxVotes} pilihan!`;
+                return;
+            }
+
+            if (!votes[sessionId]) {
+                votes[sessionId] = {};
+            }
+            votes[sessionId][currentUser] = selectedVotes;
+
+            localStorage.setItem('votes', JSON.stringify(votes));
+            document.getElementById('votingSuccess').textContent = 'Vote berhasil disimpan!';
+            updateActiveSession();
+        }
+
+        function formatVoteResults(votes) {
+            const results = {};
+            Object.values(votes).forEach(userVotes => {
+                userVotes.forEach(vote => {
+                    results[vote] = (results[vote] || 0) + 1;
+                });
+            });
+
+            return Object.entries(results)
+                .sort((a, b) => b[1] - a[1])
+                .map(([name, count]) => `${name}: ${count} suara`)
+                .join('\n');
+        }
+    </script>
+</body>
+</html>
